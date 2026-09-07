@@ -22,7 +22,7 @@ set -euo pipefail
 APP="kado-web"
 APP_PORT="${APP_PORT:-8080}"
 CTID="${CTID:-103}"
-HOSTNAME="${HOSTNAME:-kadoHabbit}"
+CT_HOSTNAME="${CT_HOSTNAME:-kadoHabbit}"  # NOTE: heißt bewusst CT_HOSTNAME — $HOSTNAME ist auf dem Host schon belegt!
 CTID_AUTO="${CTID_AUTO:-1}"      # 1 = falls Nr. vergeben, nächste freie wählen; 0 = strikt diese ID
 CTID_FORCE_UPDATE="${CTID_FORCE_UPDATE:-0}"  # 1 = existierenden CT updaten statt auszuweichen
 CPU="${CPU:-1}"
@@ -72,10 +72,10 @@ trap fail ERR
 
 usage() {
   cat <<EOF
-$APP Installer — erstellt LXC "$HOSTNAME" (CT-ID ab $CTID, Auto-Next bei Belegung)
+$APP Installer — erstellt LXC "$CT_HOSTNAME" (CT-ID ab $CTID, Auto-Next bei Belegung)
 
 Env-Variablen (alle optional):
-  CTID=$CTID CTID_AUTO=1 CTID_FORCE_UPDATE=0 HOSTNAME=$HOSTNAME
+  CTID=$CTID CTID_AUTO=1 CTID_FORCE_UPDATE=0 CT_HOSTNAME=$CT_HOSTNAME
   CPU=$CPU RAM=$RAM DISK=$DISK
   STORAGE=$STORAGE TEMPLATE_STORAGE=$TEMPLATE_STORAGE BRIDGE=$BRIDGE
   APP_PORT=$APP_PORT GITHUB_REPO=$GITHUB_REPO GITHUB_BRANCH=$GITHUB_BRANCH
@@ -94,7 +94,7 @@ header() {
   echo -e "${GN}  _  __         _       ${CL}"
   echo -e "${GN} | |/ /__ _  __| | ___  ${CL}  $APP · Proxmox LXC Installer"
   echo -e "${GN} | ' // _\` |/ _\` |/ _ \\ ${CL}  CPU=$CPU RAM=${RAM}MB Disk=${DISK}GB Port=$APP_PORT"
-  echo -e "${GN} | . \\ (_| | (_| | (_) |${CL}  CT=$CTID ($HOSTNAME) Repo=$GITHUB_REPO"
+  echo -e "${GN} | . \\ (_| | (_| | (_) |${CL}  CT=$CTID ($CT_HOSTNAME) Repo=$GITHUB_REPO"
   echo -e "${GN} |_|\\_\\__,_|\\__,_|\\___/ ${CL}"
 }
 
@@ -115,7 +115,16 @@ pick_template() {
   echo "${TEMPLATE_STORAGE}:vztmpl/${tpl##*/}"
 }
 
-ctid_in_use() { pct status "$1" >/dev/null 2>&1 || pct config "$1" >/dev/null 2>&1; }
+PVE_CONF_DIR="${PVE_CONF_DIR:-/etc/pve}"  # nur für Tests überschreibbar
+ctid_in_use() {
+  # pct/qm allein reichen nicht: pct sieht keine QEMU-VMs und umgekehrt.
+  # Darum Config-Dateien in pmxcfs prüfen (gilt für LXC *und* QEMU, alle Nodes).
+  local id="$1"
+  [[ -e "${PVE_CONF_DIR}/lxc/${id}.conf" || -e "${PVE_CONF_DIR}/qemu-server/${id}.conf" ]] && return 0
+  pct status "$id" >/dev/null 2>&1 && return 0
+  qm status "$id" >/dev/null 2>&1 && return 0
+  return 1
+}
 ctid_hostname() { pct config "$1" 2>/dev/null | awk -F': ' '/^hostname:/ {print $2}'; }
 container_exists() { ctid_in_use "$CTID"; }
 container_ip() { pct exec "$CTID" -- hostname -I 2>/dev/null | awk '{print $1}'; }
@@ -129,7 +138,7 @@ resolve_ctid() {
   fi
   if ! ctid_in_use "$CTID"; then return; fi
   local owner; owner=$(ctid_hostname "$CTID")
-  if [[ "$owner" == "$HOSTNAME" ]]; then
+  if [[ "$owner" == "$CT_HOSTNAME" ]]; then
     msg_warn "CT $CTID existiert bereits und heißt '$owner' → Update-Pfad (idempotent)."
     return
   fi
@@ -142,16 +151,16 @@ resolve_ctid() {
     CTID=$((CTID + 1))
     [[ "$CTID" -gt 999999 ]] && { msg_error "Keine freie CT-ID gefunden."; exit 1; }
   done
-  msg_ok "Freie CT-ID gefunden: $CTID (Hostname: $HOSTNAME)."
+  msg_ok "Freie CT-ID gefunden: $CTID (Hostname: $CT_HOSTNAME)."
 }
 
 create_container() {
   local tpl; tpl=$(pick_template)
-  msg_info "Erstelle LXC $CTID ($HOSTNAME) aus $tpl …"
+  msg_info "Erstelle LXC $CTID ($CT_HOSTNAME) aus $tpl …"
   local pw_args=()
   if [[ -n "$PASSWORD" ]]; then pw_args=(--password "$PASSWORD"); else pw_args=(--password "$(openssl rand -base64 12)"); fi
   pct create "$CTID" "$tpl" \
-    --hostname "$HOSTNAME" --cores "$CPU" --memory "$RAM" \
+    --hostname "$CT_HOSTNAME" --cores "$CPU" --memory "$RAM" \
     --rootfs "${STORAGE}:${DISK}" --net0 "name=eth0,bridge=${BRIDGE},ip=dhcp" \
     --onboot "$ONBOOT" --unprivileged "$UNPRIVILEGED" \
     --features nesting=1 "${pw_args[@]}"

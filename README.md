@@ -40,7 +40,7 @@ DEBUG=1 bash -c "$(wget -qLO - https://raw.githubusercontent.com/HatchetMan111/K
 
 ```bash
 CTID=110 APP_PORT=8080 bash install/kado.sh        # andere ID / anderer Port
-HOSTNAME=kadoHabbit CPU=2 RAM=2048 DISK=8 bash install/kado.sh
+CT_HOSTNAME=kadoHabbit CPU=2 RAM=2048 DISK=8 bash install/kado.sh
 CTID_AUTO=0 CTID=110 bash install/kado.sh          # strikt diese ID, kein Ausweichen
 CTID_FORCE_UPDATE=1 CTID=103 bash install/kado.sh  # bestehenden CT 103 updaten statt auszuweichen
 STORAGE=local-lvm BRIDGE=vmbr0 bash install/kado.sh
@@ -48,7 +48,7 @@ STORAGE=local-lvm BRIDGE=vmbr0 bash install/kado.sh
 
 | Variable | Default | Bedeutung |
 |---|---|---|
-| `HOSTNAME` | `kadoHabbit` | LXC-Name |
+| `CT_HOSTNAME` | `kadoHabbit` | LXC-Name |
 | `CTID` | `103` | Wunsch-ID, bei Belegung nächste freie |
 | `CTID_AUTO` | `1` | `1` = nächste freie ID wählen, `0` = abbrechen wenn belegt |
 | `CTID_FORCE_UPDATE` | `0` | `1` = existierenden CT updaten |
