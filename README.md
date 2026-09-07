@@ -91,6 +91,11 @@ bash -n install/kado.sh
 
 - **CT-ID belegt?** Kein Problem — das Script nimmt automatisch die nächste freie
   und meldet z. B. `Freie CT-ID gefunden: 104`. Mit `CTID_AUTO=0` wird stattdessen abgebrochen.
+  Hinweis: LXC und QEMU-VMs teilen sich den ID-Raum — eine belegte ID kann auch eine
+  VM sein (`VM 103 already exists`). Das Script erkennt beides (`qm` + pmxcfs-Configs)
+  und weicht aus; nur ein CT mit gleichem Hostnamen wird geupdatet.
+  Falls du eine alte Script-Version erwischt hast (ohne diese Erkennung):
+  Einzeiler erneut laden (aktuelle Version vom `main`-Branch) und erneut laufen lassen.
 - **Service nicht aktiv?** Im Container schauen: `pct exec <ID> -- journalctl -u kado --no-pager -n 50`.
 - **Keine IP?** `pct exec <ID> -- hostname -I`; Bridge/DHCP prüfen: `pct config <ID>`.
 - **Installationsfehler?** Log auf dem Host unter `/tmp/kado-web-install-*.log`, oder mit `DEBUG=1` erneut laufen lassen.
@@ -108,7 +113,18 @@ bash -n install/kado.sh
   Web-UI : http://192.168.1.103:8080
 ```
 
-## Lizenz
+## Lizenz & Herkunft (bitte lesen)
 
-App-Nachbau: MIT. Upstream-Idee & Algorithmus: [scastiel/kado](https://github.com/scastiel/kado) (MIT).
-Loop-Algorithmus-Idee: eigenständig reimplementiert, kein Copy.
+- **Dieser Installer + Web-Nachbau:** MIT — siehe `LICENSE` (Copyright 2026 HatchetMan111).
+- **Upstream-Idee & Algorithmus:** [scastiel/kado](https://github.com/scastiel/kado) (MIT, © Sébastien Castiel).
+  Es wurde **kein Upstream-Code und kein Branding** übernommen (keine SVGs, keine
+  Screenshots, keine Swift-Dateien) — die Score-/Streak-Logik ist anhand der
+  öffentlichen Specs (`docs/habit-score.md`, `docs/streak.md`) **eigenständig
+  reimplementiert**. Die EMA-Formel selbst ist Standard-Mathematik, nicht schutzfähig.
+- **Loop-Habit-Tracker-Algorithmus-Idee:** eigenständig reimplementiert, kein Copy
+  (Loop steht unter GPLv3 — darum bewusst keine Code-Übernahme).
+- **Inoffiziell:** Dieses Projekt ist *nicht* mit Sébastien Castiel / Kadō affiliiert.
+  „Kadō" bleibt Marke des Upstream-Autors; der Container heißt bewusst `kadoHabbit`
+  (eigener Name für den Nachbau), nicht „Kadō".
+- **Stil-Anlehnung:** „im Stil der Community Scripts" bezieht sich nur auf das
+  Bedienkonzept (Einzeiler, Variablen oben, Verifikation) — kein Code von dort kopiert.

@@ -130,23 +130,32 @@ container_exists() { ctid_in_use "$CTID"; }
 container_ip() { pct exec "$CTID" -- hostname -I 2>/dev/null | awk '{print $1}'; }
 
 # Falls Nr. vergeben: nächste freie wählen — außer der CT gehört schon zu uns (Update).
+# WICHTIG: LXC und QEMU-VMs teilen sich den ID-Raum. `pct status` allein sieht
+# keine QEMU-VMs — darum prüft ctid_in_use zusätzlich qm + pmxcfs-Configs.
+# Genau das war der Bug hinter "VM 103 already exists on node ...".
+is_qemu_vm() { ! pct config "$1" >/dev/null 2>&1 && qm status "$1" >/dev/null 2>&1; }
 resolve_ctid() {
   local wanted="$CTID"
   if [[ "$CTID_FORCE_UPDATE" == "1" ]]; then
+    if is_qemu_vm "$CTID"; then
+      msg_error "CTID_FORCE_UPDATE=1, aber ID $CTID ist eine QEMU-VM (kein Container) — Update unmöglich. Andere CTID wählen."
+      exit 1
+    fi
     msg_info "CTID_FORCE_UPDATE=1 → verwende CT $CTID (Update)."
     return
   fi
   if ! ctid_in_use "$CTID"; then return; fi
   local owner; owner=$(ctid_hostname "$CTID")
+  if is_qemu_vm "$CTID"; then owner="QEMU-VM (kein Container)"; fi
   if [[ "$owner" == "$CT_HOSTNAME" ]]; then
     msg_warn "CT $CTID existiert bereits und heißt '$owner' → Update-Pfad (idempotent)."
     return
   fi
   if [[ "$CTID_AUTO" != "1" ]]; then
-    msg_error "CT $CTID ist bereits vergeben (hostname: '${owner:-?}'). Freie ID wählen oder CTID_AUTO=1 setzen."
+    msg_error "CT $CTID ist bereits vergeben (${owner:-unbekannt}). Freie ID wählen oder CTID_AUTO=1 setzen."
     exit 1
   fi
-  msg_warn "CT $wanted vergeben (hostname: '${owner:-?}') → suche nächste freie ID…"
+  msg_warn "CT $wanted vergeben (${owner:-unbekannt}) → suche nächste freie ID…"
   while ctid_in_use "$CTID"; do
     CTID=$((CTID + 1))
     [[ "$CTID" -gt 999999 ]] && { msg_error "Keine freie CT-ID gefunden."; exit 1; }
