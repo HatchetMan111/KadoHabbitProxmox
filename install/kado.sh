@@ -16,6 +16,7 @@
 # License: MIT
 # ============================================================================
 set -euo pipefail
+set -E  # ERR-Trap auch in Funktionen/Subshels vererben — sonst stille Abbrüche ohne Fehlerkette
 [[ "${DEBUG:-0}" == "1" ]] && set -x
 
 # ----------------------------- Variablen (oben) -----------------------------
@@ -43,7 +44,8 @@ RAW_BASE="https://raw.githubusercontent.com/${GITHUB_REPO}/${GITHUB_BRANCH}"
 # ----------------------------------------------------------------------------
 
 LOG_FILE="/tmp/${APP}-install-$(date +%F-%H%M%S).log"
-exec > >(tee -a "$LOG_FILE") 2>&1
+# Fällt das Tee-Log aus (z. B. /tmp voll/ro), trotzdem weiter — aber laut melden.
+exec > >(tee -a "$LOG_FILE") 2>&1 || { echo "WARN: Tee-Log nach $LOG_FILE nicht möglich, weiter ohne." >&2; }
 
 # ------------------------------- Farben/Log -------------------------------
 GN="\e[32m"; YW="\e[33m"; RD="\e[31m"; BL="\e[36m"; CL="\e[0m"
@@ -261,9 +263,13 @@ verify() {
 
 main() {
   header
+  msg_info "Preflight: Root-Check + Tool-Check (pct, pveam, wget)…"
   [[ $EUID -eq 0 ]] || { msg_error "Bitte als root auf dem Proxmox-Host ausführen."; exit 1; }
   need_host_tool pct; need_host_tool pveam; need_host_tool wget
+  command -v qm >/dev/null 2>&1 || msg_warn "'qm' nicht gefunden — QEMU-Belegung wird nur via pmxcfs-Configs erkannt."
+  msg_info "Tool-Check ok."
   resolve_ctid
+  msg_info "Verwende CT $CTID ($CT_HOSTNAME)."
   if container_exists; then
     msg_warn "CT $CTID existiert bereits → Update-Pfad (idempotent, kein Re-Create)."
     pct start "$CTID" 2>/dev/null || true
