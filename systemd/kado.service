@@ -1,0 +1,22 @@
+[Unit]
+Description=Kado-Web - lokaler Habit-Tracker (FastAPI)
+Documentation=https://github.com/scastiel/kado
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=kado
+Group=kado
+WorkingDirectory=/opt/kado
+Environment=PORT=8080
+Environment=KADO_DATA_DIR=/var/lib/kado
+ExecStart=/opt/kado/.venv/bin/uvicorn app:app --host 0.0.0.0 --port 8080
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/kado
+
+[Install]
+WantedBy=multi-user.target
