@@ -127,7 +127,11 @@ ctid_in_use() {
   qm status "$id" >/dev/null 2>&1 && return 0
   return 1
 }
-ctid_hostname() { pct config "$1" 2>/dev/null | awk -F': ' '/^hostname:/ {print $2}'; }
+ctid_hostname() {
+  # Muss für QEMU-VM-IDs (pct config scheitert) LEER und status-0 liefern:
+  # ohne `|| true` schlägt die Pipe via pipefail durch und set -E bricht ab.
+  pct config "$1" 2>/dev/null | awk -F': ' '/^hostname:/ {print $2}' || true
+}
 container_exists() { ctid_in_use "$CTID"; }
 container_ip() { pct exec "$CTID" -- hostname -I 2>/dev/null | awk '{print $1}'; }
 
