@@ -117,10 +117,13 @@ bash -n install/kado.sh
 
 - **Dieser Installer + Web-Nachbau:** MIT — siehe `LICENSE` (Copyright 2026 HatchetMan111).
 - **Upstream-Idee & Algorithmus:** [scastiel/kado](https://github.com/scastiel/kado) (MIT, © Sébastien Castiel).
-  Es wurde **kein Upstream-Code und kein Branding** übernommen (keine SVGs, keine
-  Screenshots, keine Swift-Dateien) — die Score-/Streak-Logik ist anhand der
-  öffentlichen Specs (`docs/habit-score.md`, `docs/streak.md`) **eigenständig
-  reimplementiert**. Die EMA-Formel selbst ist Standard-Mathematik, nicht schutzfähig.
+  Es wurde kein Upstream-**Code** übernommen und die Score-/Streak-Logik ist anhand
+  der öffentlichen Specs (`docs/habit-score.md`, `docs/streak.md`) **eigenständig
+  reimplementiert** (die EMA-Formel selbst ist Standard-Mathematik, nicht schutzfähig).
+  Ausnahme: Das **Favicon** (`/favicon.svg`) ist die Original-Datei
+  `branding/kado-app-icon.svg` aus dem Upstream-Repo, unter dessen MIT-Lizenz
+  übernommen (© Sébastien Castiel) und wird direkt aus der App ausgeliefert
+  (kein Hotlinking, keine externen Requests).
 - **Loop-Habit-Tracker-Algorithmus-Idee:** eigenständig reimplementiert, kein Copy
   (Loop steht unter GPLv3 — darum bewusst keine Code-Übernahme).
 - **Inoffiziell:** Dieses Projekt ist *nicht* mit Sébastien Castiel / Kadō affiliiert.

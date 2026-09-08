@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 
 APP_NAME = "kado-web"
@@ -283,9 +283,10 @@ INDEX_HTML = """<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">
 <meta name="description" content="Kadō-Web — lokaler Habit-Tracker im LXC. Habit-Score statt Streak, offline-first, kein Cloud-Zwang.">
 <meta name="theme-color" content="#FBF8F2" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#121513" media="(prefers-color-scheme: dark)">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <title>Kadō-Web · lokal</title>
 <style>
-/* Design angelehnt an getkado.app (MIT, scastiel/kado) — eigene Umsetzung, keine Assets kopiert. */
+/* Design angelehnt an getkado.app; Favicon: kado-app-icon.svg aus scastiel/kado (MIT). */
 :root{--bg:#FBF8F2;--bg-deep:#F0E8D8;--surface:#FFF;--ink:#1A1F1C;--ink-soft:#5a625c;--ink-faint:#9aa19c;
 --accent:#355944;--accent-strong:#244031;--accent-soft:rgba(53,89,68,.08);--accent-border:rgba(53,89,68,.2);
 --hairline:rgba(26,31,28,.08);--shadow:0 1px 2px rgba(26,31,28,.04),0 12px 40px rgba(26,31,28,.08);
@@ -425,6 +426,33 @@ load().catch(e=>{document.getElementById('stats').textContent='Fehler: '+e.messa
 @app.get("/", response_class=HTMLResponse)
 def index():
     return INDEX_HTML
+
+
+# Favicon: 1:1 aus scastiel/kado (branding/kado-app-icon.svg), MIT-Lizenz,
+# © Sébastien Castiel — https://github.com/scastiel/kado/blob/main/branding/kado-app-icon.svg
+FAVICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" fill="none">
+  <defs>
+    <linearGradient id="icon-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FBF8F2"></stop>
+      <stop offset="1" stop-color="#F0E8D8"></stop>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="180" height="180" fill="url(#icon-bg)"></rect>
+  <g transform="translate(30,30)">
+    <path d="M 92 30
+             C 102 44, 102 68, 90 82
+             C 78 96, 56 100, 38 92
+             C 20 84, 12 64, 18 46
+             C 24 28, 44 18, 62 22
+             C 74 24, 82 28, 88 34" stroke="#355944" stroke-width="12" stroke-linecap="round" fill="none"></path>
+    <circle cx="92" cy="30" r="6" fill="#355944"></circle>
+  </g>
+</svg>"""
+
+
+@app.get("/favicon.svg", include_in_schema=False)
+def favicon():
+    return Response(content=FAVICON_SVG, media_type="image/svg+xml")
 
 
 if __name__ == "__main__":
