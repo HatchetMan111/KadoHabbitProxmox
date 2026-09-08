@@ -280,37 +280,145 @@ def export_all():
 
 INDEX_HTML = """<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Kadō-Web — lokaler Habit-Tracker im LXC. Habit-Score statt Streak, offline-first, kein Cloud-Zwang.">
+<meta name="theme-color" content="#FBF8F2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121513" media="(prefers-color-scheme: dark)">
 <title>Kadō-Web · lokal</title>
 <style>
-:root{color-scheme:light dark}body{font-family:system-ui,sans-serif;max-width:860px;margin:2rem auto;padding:0 1rem;line-height:1.5}
-.card{border:1px solid #8884;border-radius:12px;padding:1rem;margin:.75rem 0}
-.bar{height:10px;border-radius:6px;background:#8883;overflow:hidden}.bar>i{display:block;height:100%;background:#2f9e44}
-.row{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}input,select,button{font-size:1rem;padding:.45rem .6rem;border-radius:8px;border:1px solid #8886}
-button{cursor:pointer}.muted{opacity:.7}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:.75rem}
+/* Design angelehnt an getkado.app (MIT, scastiel/kado) — eigene Umsetzung, keine Assets kopiert. */
+:root{--bg:#FBF8F2;--bg-deep:#F0E8D8;--surface:#FFF;--ink:#1A1F1C;--ink-soft:#5a625c;--ink-faint:#9aa19c;
+--accent:#355944;--accent-strong:#244031;--accent-soft:rgba(53,89,68,.08);--accent-border:rgba(53,89,68,.2);
+--hairline:rgba(26,31,28,.08);--shadow:0 1px 2px rgba(26,31,28,.04),0 12px 40px rgba(26,31,28,.08);
+--serif:ui-serif,"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+--sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Helvetica,Arial,sans-serif;
+--mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;--radius:14px}
+@media (prefers-color-scheme:dark){:root{--bg:#121513;--bg-deep:#0C0E0D;--surface:#1A1F1C;--ink:#ECE8DE;
+--ink-soft:#a8a9a3;--ink-faint:#6b6d66;--accent:#8fb8a0;--accent-strong:#b6d3bf;--accent-soft:rgba(143,184,160,.1);
+--accent-border:rgba(143,184,160,.24);--hairline:rgba(236,232,222,.1);
+--shadow:0 1px 2px rgba(0,0,0,.4),0 20px 48px rgba(0,0,0,.5)}}
+*{box-sizing:border-box}body{margin:0;font-family:var(--sans);font-size:17px;line-height:1.55;color:var(--ink);
+background:radial-gradient(ellipse at top,var(--bg-deep) 0%,var(--bg) 55%) no-repeat,var(--bg);
+-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline;text-underline-offset:3px}
+h1,h2,h3{font-family:var(--serif);font-weight:500;letter-spacing:-.015em;line-height:1.15;margin:0 0 .5em}
+h1{font-size:clamp(2rem,4vw + 1rem,3rem)}h2{font-size:clamp(1.4rem,1.5vw + 1rem,2rem)}
+h3{font-size:1.125rem;font-family:var(--sans);font-weight:600}
+p{margin:0 0 1em;color:var(--ink-soft)}
+.container{width:100%;max-width:1100px;margin:0 auto;padding:0 24px}
+.site-header{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--hairline)}
+.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 24px;max-width:1100px;margin:0 auto}
+.brand{display:flex;align-items:center;gap:6px;color:var(--ink)}.brand:hover{text-decoration:none}
+.brand-mark{width:34px;height:34px;color:var(--ink);flex-shrink:0}
+.brand-name{font-family:var(--serif);font-size:1.5rem;letter-spacing:-.01em}
+.brand-tag{font-family:var(--serif);font-size:.72rem;color:var(--ink-faint);letter-spacing:.14em;white-space:nowrap;margin-left:4px}
+@media(max-width:560px){.brand-tag{display:none}}
+.nav nav{display:flex;align-items:center;gap:20px;font-size:.95rem}.nav nav a{color:var(--ink-soft)}
+.nav nav a:hover{color:var(--ink);text-decoration:none}
+.hero{text-align:center;padding:clamp(40px,7vw,80px) 24px clamp(24px,4vw,44px);max-width:860px;margin:0 auto}
+.hero .lede{font-size:clamp(1.02rem,.5vw + 1rem,1.2rem);max-width:56ch;margin:0 auto 1.6rem}
+.hero-note{margin-top:20px;font-size:.9rem;color:var(--ink-faint)}
+.cta{display:flex;justify-content:center;align-items:center;gap:14px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:12px 22px;border-radius:999px;font-weight:500;
+font-size:.98rem;border:1px solid transparent;cursor:pointer;background:var(--accent);color:var(--bg)}
+.btn:hover{background:var(--accent-strong);text-decoration:none;transform:translateY(-1px)}
+.btn-secondary{background:transparent;color:var(--ink);border-color:var(--hairline)}
+.btn-secondary:hover{background:var(--accent-soft);border-color:var(--accent-border);color:var(--ink)}
+section.block{padding:clamp(36px,6vw,72px) 0;border-top:1px solid var(--hairline)}
+.section-head{text-align:center;max-width:48rem;margin:0 auto clamp(24px,4vw,44px)}
+.section-kicker{font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.14em;color:var(--accent);margin-bottom:12px}
+.feature-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px}
+.feature-grid article{background:var(--surface);border:1px solid var(--hairline);border-radius:var(--radius);
+padding:24px;transition:border-color .15s,transform .15s}
+.feature-grid article:hover{border-color:var(--accent-border);transform:translateY(-2px)}
+.feature-grid h3{color:var(--ink);margin-bottom:4px}.feature-grid p{margin:0 0 .6em;font-size:.98rem}
+.meta{font-size:.85rem;color:var(--ink-faint);margin-bottom:12px}
+.score-row{display:flex;align-items:baseline;gap:10px;margin:.4em 0 .2em}
+.score-pct{font-family:var(--serif);font-size:1.9rem;color:var(--ink)}
+.score-label{font-size:.85rem;color:var(--accent);font-weight:600}
+.bar{height:10px;border-radius:6px;background:var(--hairline);overflow:hidden;margin:8px 0 12px}
+.bar>i{display:block;height:100%;background:var(--accent);border-radius:6px;transition:width .3s}
+.dots{display:flex;gap:6px;margin:4px 0 14px}.dots i{width:12px;height:12px;border-radius:50%;background:var(--hairline)}
+.dots i.done{background:var(--accent)}.dots i.today{outline:2px solid var(--accent-border);outline-offset:1px}
+.card-actions{display:flex;gap:10px;flex-wrap:wrap}
+.btn-small{padding:8px 16px;font-size:.9rem}
+.btn-ghost{background:transparent;color:var(--ink-soft);border-color:var(--hairline)}
+.btn-ghost:hover{color:var(--ink);border-color:var(--accent-border);background:var(--accent-soft)}
+.form-card{background:var(--surface);border:1px solid var(--hairline);border-radius:var(--radius);padding:24px;
+max-width:640px;margin:0 auto;box-shadow:var(--shadow)}
+.form-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+input,select{font-size:1rem;font-family:var(--sans);padding:11px 14px;border-radius:10px;border:1px solid var(--hairline);
+background:var(--bg);color:var(--ink)}input:focus,select:focus{outline:2px solid var(--accent-border);border-color:var(--accent)}
+#n{flex:2;min-width:180px}#msg{min-height:1.4em;font-size:.9rem;color:var(--accent);margin:.6em 0 0}
+.empty{text-align:center;color:var(--ink-faint);padding:24px}
+footer{padding:40px 0 28px;border-top:1px solid var(--hairline);background:var(--bg-deep);
+color:var(--ink-soft);font-size:.92rem;text-align:center}
+footer nav{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-bottom:12px}
+.foot-bottom{color:var(--ink-faint);font-size:.85rem;margin:0}
+code{font-family:var(--mono);font-size:.92em;background:var(--accent-soft);color:var(--accent);padding:.1em .35em;border-radius:4px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style></head><body>
-<h1>稼働 Kadō-Web <span class="muted">· lokal · kein Cloud-Zwang</span></h1>
-<p class="muted">Score statt Streak (EMA α=0.05, wie <a href="https://github.com/scastiel/kado">scastiel/kado</a>). Daten: SQLite im Container.</p>
-<div class="card"><h3>Neuer Habit</h3><div class="row">
-<input id="n" placeholder="z. B. Lesen" style="flex:2">
+<header class="site-header"><div class="nav">
+<a href="/" class="brand" aria-label="Kadō-Web Start">
+<svg class="brand-mark" viewBox="0 0 120 120" fill="none" aria-hidden="true">
+<path d="M 90 32 C 100 46, 100 68, 88 82 C 76 96, 56 100, 40 92 C 24 84, 16 64, 22 46 C 28 28, 46 20, 62 24 C 72 26, 80 30, 86 36" stroke="currentColor" stroke-width="10" stroke-linecap="round" fill="none" opacity="0.95"/>
+<circle cx="90" cy="32" r="5" fill="currentColor" opacity="0.95"/></svg>
+<span class="brand-name">Kadō-Web</span><span class="brand-tag">稼働 · LOKAL</span></a>
+<nav><a href="#heute">Heute</a><a href="#neu">Neu</a><a href="/api/export">Export</a><a href="/healthz">Status</a></nav>
+</div></header>
+<main>
+<section class="hero">
+<h1>Habits, die dich nicht bestrafen.</h1>
+<p class="lede">Ein lokaler Habit-Tracker im Proxmox-LXC — mit Habit-Score statt fragiler Streak
+(EMA α=0.05, wie <a href="https://github.com/scastiel/kado">scastiel/kado</a>). Offline-first,
+SQLite im Container, kein Account, kein Cloud-Zwang.</p>
+<div class="cta"><a class="btn" href="#neu">+ Neuer Habit</a>
+<a class="btn btn-secondary" href="/api/export">JSON-Export</a></div>
+<p class="hero-note" id="stats">Verbinde …</p>
+</section>
+<section class="block" id="heute"><div class="container">
+<div class="section-head"><div class="section-kicker">Heute</div><h2>Deine Habits</h2>
+<p>Antippen zum Abhaken. Ein verpasster Tag stupst den Score nur an — er löscht nicht Monate an Fortschritt.</p></div>
+<div id="list" class="feature-grid"></div>
+</div></section>
+<section class="block" id="neu"><div class="container">
+<div class="section-head"><div class="section-kicker">Neu anfangen</div><h2>Neuer Habit</h2></div>
+<div class="form-card"><div class="form-row">
+<input id="n" placeholder="z. B. Lesen" maxlength="120">
 <select id="f"><option value="daily">Täglich</option><option value="specificDays">Bestimmte Wochentage</option><option value="everyNDays">Alle N Tage</option><option value="daysPerWeek">N× pro Woche</option></select>
-<button onclick="addHabit()">Anlegen</button></div>
-<p class="muted" id="msg"></p></div>
-<div id="list" class="grid"></div>
-<p class="muted"><a href="/healthz">healthz</a> · <a href="/api/export">JSON-Export</a></p>
+<button class="btn btn-small" onclick="addHabit()">Anlegen</button></div>
+<p id="msg"></p></div>
+</div></section>
+</main>
+<footer><nav><a href="https://github.com/scastiel/kado">Upstream-Idee (Kadō)</a>
+<a href="https://github.com/HatchetMan111/KadoHabbitProxmox">Installer-Repo</a>
+<a href="/api/export">Export</a><a href="/healthz">Status</a></nav>
+<p class="foot-bottom">Kadō-Web · lokaler Nachbau im LXC — inoffiziell, nicht mit Sébastien Castiel affiliiert · Design angelehnt an getkado.app (MIT)</p></footer>
 <script>
+const FREQ={daily:"Täglich",specificDays:"Wochentage",everyNDays:"Alle N Tage",daysPerWeek:"N×/Woche"};
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 async function api(p,o){const r=await fetch(p,{headers:{'Content-Type':'application/json'},...o});if(!r.ok)throw new Error(await r.text());return r.json()}
+function dots(comps){const h=[];const t=new Date();for(let i=13;i>=0;i--){const d=new Date(t);d.setDate(t.getDate()-i);
+const k=d.toISOString().slice(0,10);const done=comps&&comps[k]>0;
+h.push(`<i class="${done?'done':''} ${i===0?'today':''}" title="${k}${done?' ✓':''}"></i>`)}return h.join('')}
 async function load(){const h=await api('/api/habits');const el=document.getElementById('list');el.innerHTML='';
-h.forEach(x=>{const d=document.createElement('div');d.className='card';
-d.innerHTML=`<b>${x.name}</b> <span class="muted">#${x.id} · ${x.freq_type} · ${x.score_label}</span>
+document.getElementById('stats').textContent=h.length?`${h.length} Habit${h.length>1?'s':''} ·Ø-Score ${Math.round(h.reduce((a,x)=>a+x.score_pct,0)/h.length)} %`:'Noch keine Habits — leg oben einen an.';
+h.forEach(x=>{const d=document.createElement('article');
+d.innerHTML=`<h3>${esc(x.name)}</h3><div class="meta">#${x.id} · ${FREQ[x.freq_type]||x.freq_type} · ${esc(x.score_label)}</div>
+<div class="score-row"><span class="score-pct">${x.score_pct} %</span><span class="score-label">Streak ${x.streak_current} · Best ${x.streak_best}</span></div>
 <div class="bar"><i style="width:${x.score_pct}%"></i></div>
-<p>Score <b>${x.score_pct}%</b> · Streak <b>${x.streak_current}</b> (best ${x.streak_best})</p>
-<div class="row"><button data-a="done">Heute erledigt</button><button data-a="del">Löschen</button></div>`;
-d.querySelector('[data-a=done]').onclick=async()=>{await api('/api/habits/'+x.id+'/complete',{method:'POST',body:JSON.stringify({})});load()};
-d.querySelector('[data-a=del]').onclick=async()=>{if(confirm('Wirklich löschen?')){await api('/api/habits/'+x.id,{method:'DELETE'});load()}};
-el.appendChild(d)});if(!h.length)el.innerHTML='<p class=muted>Noch keine Habits — oben anlegen.</p>'}
-async function addHabit(){const n=document.getElementById('n').value.trim();if(!n){document.getElementById('msg').textContent='Bitte Namen eingeben.';return}
-await api('/api/habits',{method:'POST',body:JSON.stringify({name:n,freq_type:document.getElementById('f').value})});document.getElementById('n').value='';load()}
-load().catch(e=>document.getElementById('msg').textContent='Fehler: '+e.message);
+<div class="dots">${dots(x.completions)}</div>
+<div class="card-actions"><button class="btn btn-small" data-a="done">Heute erledigt ✓</button><button class="btn btn-small btn-ghost" data-a="del">Löschen</button></div>`;
+d.querySelector('[data-a=done]').onclick=async e=>{e.target.disabled=true;try{await api('/api/habits/'+x.id+'/complete',{method:'POST',body:JSON.stringify({})});await load()}catch(err){document.getElementById('msg').textContent='Fehler: '+err.message;e.target.disabled=false}};
+d.querySelector('[data-a=del]').onclick=async()=>{if(confirm(`„${x.name}" wirklich löschen?`)){await api('/api/habits/'+x.id,{method:'DELETE'});load()}};
+el.appendChild(d)});
+if(!h.length)el.innerHTML='<p class="empty">Noch keine Habits — <a href="#neu">leg deinen ersten an</a>.</p>'}
+async function addHabit(){const n=document.getElementById('n').value.trim();const m=document.getElementById('msg');
+if(!n){m.textContent='Bitte Namen eingeben.';return}m.textContent='';
+try{await api('/api/habits',{method:'POST',body:JSON.stringify({name:n,freq_type:document.getElementById('f').value})});
+document.getElementById('n').value='';m.textContent='Angelegt ✓';await load();document.getElementById('heute').scrollIntoView({behavior:'smooth'})}
+catch(e){m.textContent='Fehler: '+e.message}}
+document.getElementById('n').addEventListener('keydown',e=>{if(e.key==='Enter')addHabit()});
+load().catch(e=>{document.getElementById('stats').textContent='Fehler: '+e.message});
 </script></body></html>"""
 
 
