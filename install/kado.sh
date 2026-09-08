@@ -17,6 +17,7 @@
 # ============================================================================
 set -euo pipefail
 set -E  # ERR-Trap auch in Funktionen/Subshels vererben — sonst stille Abbrüche ohne Fehlerkette
+trap fail ERR  # früh setzen (Funktion wird zur Laufzeit aufgelöst); schützt auch exec/Preflight
 [[ "${DEBUG:-0}" == "1" ]] && set -x
 
 # ----------------------------- Variablen (oben) -----------------------------
@@ -63,14 +64,14 @@ fail() {
   echo "  Zeile     : $line" >&2
   echo "  Stacktrace:" >&2
   local i=0
-  while caller $i >&2 2>/dev/null; do ((i++)); done || true
+  while caller $i >&2 2>/dev/null; do i=$((i + 1)); done || true
   echo "  Logdatei  : $LOG_FILE" >&2
   echo "  Repro     : DEBUG=1 bash -x install/kado.sh (oder Einzeiler mit DEBUG=1)" >&2
   echo "  Letzte 30 Logzeilen:" >&2
   tail -n 30 "$LOG_FILE" >&2 || true
   exit "$rc"
 }
-trap fail ERR
+# (trap fail ERR steht oben bei set -E, damit auch frühe Fehler abgefangen werden)
 
 usage() {
   cat <<EOF
@@ -110,7 +111,8 @@ pick_template() {
   if [[ -z "$tpl" ]]; then
     msg_info "Debian-12-Template wird heruntergeladen (pveam)…"
     pveam update >/dev/null
-    pveam download "$TEMPLATE_STORAGE" "$(pveam available 2>/dev/null | awk '/debian-12-standard.*amd64/ {print $2}' | sort -V | tail -n1)"
+    # Paketname ist das LETZTE Feld von `pveam available` (Spaltenzahl variiert!) — nie $2.
+    pveam download "$TEMPLATE_STORAGE" "$(pveam available 2>/dev/null | awk '/debian-12-standard.*amd64/ {print $NF}' | sort -V | tail -n1)"
     tpl=$(pveam list "$TEMPLATE_STORAGE" 2>/dev/null | awk '/debian-12-standard.*amd64.*tar/ {print $1}' | sort -V | tail -n1 || true)
   fi
   [[ -z "$tpl" ]] && { msg_error "Kein Debian-Template gefunden. Setze OS_TEMPLATE manuell."; exit 1; }
@@ -119,10 +121,14 @@ pick_template() {
 
 PVE_CONF_DIR="${PVE_CONF_DIR:-/etc/pve}"  # nur für Tests überschreibbar
 ctid_in_use() {
-  # pct/qm allein reichen nicht: pct sieht keine QEMU-VMs und umgekehrt.
-  # Darum Config-Dateien in pmxcfs prüfen (gilt für LXC *und* QEMU, alle Nodes).
-  local id="$1"
-  [[ -e "${PVE_CONF_DIR}/lxc/${id}.conf" || -e "${PVE_CONF_DIR}/qemu-server/${id}.conf" ]] && return 0
+  # pct sieht keine QEMU-VMs und qm keine Container — darum zusätzlich die
+  # Config-Dateien in pmxcfs prüfen (gilt für LXC *und* QEMU, alle Nodes).
+  # Echte Pfade: /etc/pve/nodes/<node>/{lxc,qemu-server}/<id>.conf
+  # (NICHT /etc/pve/lxc/ — das Verzeichnis existiert nicht.)
+  local id="$1" f
+  for f in "${PVE_CONF_DIR}"/nodes/*/lxc/"${id}.conf" "${PVE_CONF_DIR}"/nodes/*/qemu-server/"${id}.conf"; do
+    [[ -e "$f" ]] && return 0
+  done
   pct status "$id" >/dev/null 2>&1 && return 0
   qm status "$id" >/dev/null 2>&1 && return 0
   return 1
@@ -173,7 +179,8 @@ create_container() {
   local tpl; tpl=$(pick_template)
   msg_info "Erstelle LXC $CTID ($CT_HOSTNAME) aus $tpl …"
   local pw_args=()
-  if [[ -n "$PASSWORD" ]]; then pw_args=(--password "$PASSWORD"); else pw_args=(--password "$(openssl rand -base64 12)"); fi
+  # Hex statt Base64: keine Sonderzeichen (/, +, =) im pct-Passwort.
+  if [[ -n "$PASSWORD" ]]; then pw_args=(--password "$PASSWORD"); else pw_args=(--password "$(openssl rand -hex 12)"); fi
   pct create "$CTID" "$tpl" \
     --hostname "$CT_HOSTNAME" --cores "$CPU" --memory "$RAM" \
     --rootfs "${STORAGE}:${DISK}" --net0 "name=eth0,bridge=${BRIDGE},ip=dhcp" \
@@ -195,11 +202,22 @@ wait_for_container() {
   exit 1
 }
 
-# Läuft IM Container: hängt alle Ausgaben an stderr/stdout-Kette, idempotent.
+# Läuft IM Container (via pct push + pct exec): idempotent, mit eigenem Trap,
+# damit Container-Fehler Zeile + Kommando melden statt nur einen Exit-Code.
 install_in_container() {
   msg_info "Installiere $APP im Container (idempotent)…"
-  pct push "$CTID" /dev/stdin /tmp/kado-setup.sh <<SETUP_EOF
+  # Über eine echte Temp-Datei pushen — /dev/stdin als pct-push-Quelle ist fragil
+  # (hängt am stdin des pct-Prozesses und bricht bei manchen Versionen/Terminals).
+  local setup_tmp
+  setup_tmp="$(mktemp /tmp/kado-setup.XXXXXX.sh)"
+  cat > "$setup_tmp" <<SETUP_EOF
 set -euo pipefail
+set -E
+kado_err() {
+  local code=\$?
+  echo "[kado-setup][FEHLER] Exit-Code: \${code}, Kommando: \${BASH_COMMAND:-?}, Zeile: \${BASH_LINENO[0]:-?}" >&2
+}
+trap kado_err ERR
 export DEBIAN_FRONTEND=noninteractive APP_PORT="$APP_PORT" REPO_URL="$REPO_URL" RAW_BASE="$RAW_BASE"
 echo "[kado-setup] apt…"
 apt-get update -qq
@@ -225,11 +243,18 @@ if [[ -f /opt/kado/systemd/kado.service ]]; then cp /opt/kado/systemd/kado.servi
 if [[ -f /opt/kado/src/app.py && ! -f /opt/kado/app.py ]]; then cp /opt/kado/src/app.py /opt/kado/app.py; fi
 if [[ -f /opt/kado/src/requirements.txt && ! -f /opt/kado/requirements.txt ]]; then cp /opt/kado/src/requirements.txt /opt/kado/requirements.txt; fi
 [[ -f /opt/kado/app.py ]] || { echo "[kado-setup] FEHLER: /opt/kado/app.py fehlt" >&2; exit 1; }
-python3 -m venv /opt/kado/.venv 2>/dev/null || true
+# venv-Fehler NICHT verschlucken (kein 2>/dev/null, kein || true): sonst scheitert
+# später pip kryptisch. Re-Run auf existierender venv ist ok (exit 0).
+python3 -m venv /opt/kado/.venv
 /opt/kado/.venv/bin/pip install -q --upgrade pip
 /opt/kado/.venv/bin/pip install -q -r /opt/kado/requirements.txt
 chown -R kado:kado /opt/kado /var/lib/kado
-sed -i "s/^Environment=PORT=.*/Environment=PORT=\$APP_PORT/" /etc/systemd/system/kado.service
+# PORT setzen — mit Fallback, falls die Unit-Zeile mal fehlt (dann append statt wirkungslos).
+if grep -q '^Environment=PORT=' /etc/systemd/system/kado.service; then
+  sed -i "s/^Environment=PORT=.*/Environment=PORT=\$APP_PORT/" /etc/systemd/system/kado.service
+else
+  echo "Environment=PORT=\$APP_PORT" >> /etc/systemd/system/kado.service
+fi
 systemctl daemon-reload
 systemctl enable -q kado
 systemctl restart kado
@@ -237,6 +262,8 @@ systemctl restart kado
 (iptables -C INPUT -p tcp --dport \$APP_PORT -j ACCEPT 2>/dev/null || iptables -I INPUT -p tcp --dport \$APP_PORT -j ACCEPT 2>/dev/null) || true
 echo "[kado-setup] fertig."
 SETUP_EOF
+  pct push "$CTID" "$setup_tmp" /tmp/kado-setup.sh
+  rm -f "$setup_tmp"
   pct exec "$CTID" -- bash /tmp/kado-setup.sh
   msg_ok "App installiert & Dienst gestartet."
 }
